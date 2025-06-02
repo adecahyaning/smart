@@ -146,6 +146,9 @@ def forminator_webhook():
     if not file_url:
         return jsonify({"status": "error", "message": "No valid file URL provided."}), 400
 
+    # 🔧 Ubah HTTP ke HTTPS agar aman (menghindari error fetch)
+    file_url = file_url.replace("http://", "https://")
+
     try:
         response = requests.get(file_url)
         if response.status_code != 200:
