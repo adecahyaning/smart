@@ -2,3 +2,4 @@ Flask
 requests
 PyMuPDF
 flask-cors
+psycopg2-binary
