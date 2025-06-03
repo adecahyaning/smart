@@ -1,3 +1,4 @@
+from insight_db import init_db, log_upload, get_insight
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 import os
@@ -20,6 +21,7 @@ log.setLevel(logging.DEBUG)
 app = Flask(__name__)
 CORS(app)
 UPLOAD_FOLDER = "uploads"
+init_db()
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ------------------ UTILITAS PDF ------------------
@@ -128,6 +130,9 @@ def extract_abstract_api():
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
 
+    # 🔴 Log upload setelah file disimpan
+    log_upload(filename, request.remote_addr)
+
     result = process_single_pdf(file_path)
     os.remove(file_path)
     return jsonify(result)
@@ -148,7 +153,6 @@ def forminator_webhook():
     if not file_url:
         return jsonify({"status": "error", "message": "No valid file URL provided."}), 400
 
-    # 🔧 Ubah HTTP ke HTTPS agar aman (menghindari error fetch)
     file_url = file_url.replace("http://", "https://")
 
     try:
@@ -161,6 +165,9 @@ def forminator_webhook():
         with open(file_path, "wb") as f:
             f.write(response.content)
 
+        # 🔴 Log upload setelah file disimpan
+        log_upload(filename, request.remote_addr)
+
         result = process_single_pdf(file_path)
         os.remove(file_path)
 
@@ -168,6 +175,21 @@ def forminator_webhook():
     except Exception as e:
         logging.error(f"❌ Error in webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/admin")
+def admin_page():
+    total, latest, recent = get_insight()
+    html = f"""
+    <h2>📊 Platform Insight</h2>
+    <p><strong>Total uploads:</strong> {total}</p>
+    <p><strong>Last upload:</strong> {latest}</p>
+    <h3>🕘 Last 10 uploads:</h3>
+    <ul>
+    """
+    for filename, time, ip in recent:
+        html += f"<li>{time} — {filename} ({ip})</li>"
+    html += "</ul>"
+    return html
 
 # ------------------ RUN ------------------
 
