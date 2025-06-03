@@ -3,12 +3,13 @@ from datetime import datetime
 import os
 
 DB_CONFIG = {
-    "host": os.getenv("postgres-49il.railway.internal"),
-    "port": os.getenv("5432"),
-    "dbname": os.getenv("railway"),
-    "user": os.getenv("postgres"),
-    "password": os.getenv("mkdXxxhfmdCGvehZHKduwrJvHfIOIGVw"),
+    "host": os.getenv("PGHOST"),
+    "port": os.getenv("PGPORT"),
+    "dbname": os.getenv("PGDATABASE"),
+    "user": os.getenv("PGUSER"),
+    "password": os.getenv("PGPASSWORD"),
 }
+
 
 def get_connection():
     return psycopg2.connect(**DB_CONFIG)
