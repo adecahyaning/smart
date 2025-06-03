@@ -2,12 +2,21 @@ from insight_db import init_db, log_upload, get_insight
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 import os
+import psycopg2
 import fitz
 import re
 import logging
 import requests
 import json
 from werkzeug.utils import secure_filename
+
+DB_CONFIG = {
+    "host": os.getenv("PGHOST"),
+    "port": os.getenv("PGPORT"),
+    "dbname": os.getenv("PGDATABASE"),
+    "user": os.getenv("PGUSER"),
+    "password": os.getenv("PGPASSWORD"),
+}
 
 # Konfigurasi logging
 logging.basicConfig(
