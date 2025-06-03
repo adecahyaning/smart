@@ -2,3 +2,4 @@ Flask
 requests
 PyMuPDF
 flask-cors
+sqlite3
