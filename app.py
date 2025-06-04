@@ -10,6 +10,10 @@ import logging
 import requests
 import json
 from werkzeug.utils import secure_filename
+from flask import send_file
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -230,6 +234,58 @@ def forminator_webhook():
 #     html += "</ul>"
 #     return html
 
+@app.route("/download-report", methods=["POST"])
+def download_report():
+    data = request.get_json()
+    abstract = data.get("abstract", "")
+    sdg = data.get("sdg", {})
+
+    try:
+        # Generate PDF in memory
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        y = height - 40
+
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(50, y, "SDG Classification Report")
+        y -= 30
+
+        p.setFont("Helvetica", 12)
+        p.drawString(50, y, "Abstract:")
+        y -= 20
+
+        for line in abstract.split('\n'):
+            for chunk in [line[i:i+100] for i in range(0, len(line), 100)]:
+                p.drawString(60, y, chunk)
+                y -= 15
+                if y < 50:
+                    p.showPage()
+                    y = height - 40
+
+        y -= 20
+        p.setFont("Helvetica", 12)
+        p.drawString(50, y, "SDG Scores:")
+        y -= 20
+
+        sorted_sdg = sorted(sdg.items(), key=lambda x: x[1], reverse=True)
+        for label, score in sorted_sdg:
+            p.drawString(60, y, f"{label}: {score}%")
+            y -= 15
+            if y < 50:
+                p.showPage()
+                y = height - 40
+
+        p.save()
+        buffer.seek(0)
+
+        return send_file(buffer, mimetype='application/pdf',
+                         as_attachment=True, download_name="sdg_report.pdf")
+
+    except Exception as e:
+        logging.error(f"❌ Error generating report: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+        
 @app.route("/admin", methods=["GET"])
 def admin_dashboard():
     total, last_upload, recent = get_insight()
