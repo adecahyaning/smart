@@ -1,21 +1,39 @@
-from flask import Flask, request, jsonify, render_template_string
+from insight_db import init_db, log_upload, get_insight
 from flask_cors import CORS
+from flask import Flask, request, jsonify
 import os
+import psycopg2
 import fitz
 import re
 import logging
 import requests
+import json
 from werkzeug.utils import secure_filename
-from insight_db import init_db, log_upload, get_insight  # pastikan ini ada
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+DB_CONFIG = {
+    "host": os.getenv("PGHOST"),
+    "port": os.getenv("PGPORT"),
+    "dbname": os.getenv("PGDATABASE"),
+    "user": os.getenv("PGUSER"),
+    "password": os.getenv("PGPASSWORD"),
+}
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Konfigurasi logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(levelname)s:%(name)s:%(message)s"
+)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.DEBUG)
 
+# Inisialisasi Flask
 app = Flask(__name__)
 CORS(app)
+UPLOAD_FOLDER = "uploads"
+init_db()
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# ------------------ UTILITAS PDF ------------------
 
 def remove_illegal_chars(text):
     return re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', "", text)
@@ -59,29 +77,34 @@ def extract_abstract(text):
         else:
             return " ".join(text.split()[:300])
 
+# ------------------ PROSES PDF + API AURORA ------------------
+
 def classify_with_aurora(abstract):
     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
     headers = {"Content-Type": "application/json"}
-    payload = {"text": abstract}
+    payload = json.dumps({"text": abstract})
 
     try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        predictions = response.json().get("predictions", [])
-
-        all_sdg_scores = {
-            p["sdg"]["label"]: round(p["prediction"] * 100, 2)
-            for p in predictions
-        }
-
-        logger.info("✅ SDG Classification (All):")
-        for label, score in sorted(all_sdg_scores.items(), key=lambda x: x[1], reverse=True):
-            logger.info(f"- {label}: {score}%")
-
-        return all_sdg_scores
+        response = requests.post(url, headers=headers, data=payload)
+        if response.status_code == 200:
+            predictions = response.json().get("predictions", [])
+            filtered = [
+                {
+                    "label": p["sdg"]["label"],
+                    "score": round(p["prediction"] * 100, 2)
+                }
+                for p in predictions if p["prediction"] >= 0.15
+            ]
+            logging.info("✅ SDG Classification Result:")
+            for item in filtered:
+                logging.info(f"- {item['label']}: {item['score']}%")
+            return filtered
+        else:
+            logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
+            return []
     except Exception as e:
-        logger.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
-        return {}
+        logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
+        return []
 
 def process_single_pdf(pdf_path):
     try:
@@ -94,8 +117,10 @@ def process_single_pdf(pdf_path):
             "sdg": sdg_result
         }
     except Exception as e:
-        logger.error(f"❌ Error di process_single_pdf: {str(e)}")
+        logging.error(f"❌ Error di process_single_pdf: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+# ------------------ ROUTES ------------------
 
 @app.route("/", methods=["GET"])
 def index():
@@ -114,6 +139,7 @@ def extract_abstract_api():
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
 
+    # 🔴 Log upload setelah file disimpan
     log_upload(filename, request.remote_addr)
 
     result = process_single_pdf(file_path)
@@ -123,7 +149,7 @@ def extract_abstract_api():
 @app.route("/forminator-webhook", methods=["POST"])
 def forminator_webhook():
     data = request.json
-    logger.debug("📥 Received data from Forminator: %s", data)
+    logging.debug("📥 Received data from Forminator: %s", data)
 
     upload_data = data.get("upload_1")
     if isinstance(upload_data, dict):
@@ -148,6 +174,7 @@ def forminator_webhook():
         with open(file_path, "wb") as f:
             f.write(response.content)
 
+        # 🔴 Log upload setelah file disimpan
         log_upload(filename, request.remote_addr)
 
         result = process_single_pdf(file_path)
@@ -155,66 +182,26 @@ def forminator_webhook():
 
         return jsonify(result)
     except Exception as e:
-        logger.error(f"❌ Error in webhook: {str(e)}")
+        logging.error(f"❌ Error in webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/admin", methods=["GET"])
-def admin_dashboard():
-    total, last_upload, recent = get_insight()
-
+@app.route("/admin")
+def admin_page():
+    total, latest, recent = get_insight()
     html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Platform Insight</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                margin: 40px;
-                background-color: #f9f9f9;
-                color: #333;
-            }}
-            h1 {{
-                color: #4A148C;
-            }}
-            .section {{
-                background-color: #fff;
-                padding: 20px;
-                margin-bottom: 30px;
-                border-radius: 8px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            }}
-            ul {{
-                padding-left: 20px;
-            }}
-            li {{
-                margin-bottom: 10px;
-            }}
-            .icon {{
-                font-size: 1.3em;
-                margin-right: 5px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="section">
-            <h1>📊 Platform Insight</h1>
-            <p><strong>Total uploads:</strong> {total}</p>
-            <p><strong>Last upload:</strong> {last_upload}</p>
-        </div>
-
-        <div class="section">
-            <h2 class="icon">🕒 Last 10 uploads:</h2>
-            <ul>
-                {''.join(f'<li>{t} — {f} ({ip})</li>' for t, f, ip in recent)}
-            </ul>
-        </div>
-    </body>
-    </html>
+    <h2>📊 Platform Insight</h2>
+    <p><strong>Total uploads:</strong> {total}</p>
+    <p><strong>Last upload:</strong> {latest}</p>
+    <h3>🕘 Last 10 uploads:</h3>
+    <ul>
     """
-    return render_template_string(html)
+    for filename, time, ip in recent:
+        html += f"<li>{time} — {filename} ({ip})</li>"
+    html += "</ul>"
+    return html
+
+# ------------------ RUN ------------------
 
 if __name__ == "__main__":
-    init_db()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
