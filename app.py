@@ -281,7 +281,6 @@ def admin_dashboard():
                 {''.join(f'<li>{t} — {f} ({ip})</li>' for t, f, ip in recent)}
             </ul>
 
-gmn caranya 
         </div>
     </body>
     </html>
