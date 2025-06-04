@@ -1,44 +1,21 @@
-from insight_db import init_db, log_upload, get_insight
+from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
-from flask import Flask, request, jsonify
-from flask import render_template_string
 import os
-import psycopg2
 import fitz
 import re
 import logging
 import requests
-import json
 from werkzeug.utils import secure_filename
-from flask import send_file
-from io import BytesIO
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+from insight_db import init_db, log_upload, get_insight  # pastikan ini ada
 
-DB_CONFIG = {
-    "host": os.getenv("PGHOST"),
-    "port": os.getenv("PGPORT"),
-    "dbname": os.getenv("PGDATABASE"),
-    "user": os.getenv("PGUSER"),
-    "password": os.getenv("PGPASSWORD"),
-}
-
-# Konfigurasi logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(levelname)s:%(name)s:%(message)s"
-)
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.DEBUG)
-
-# Inisialisasi Flask
-app = Flask(__name__)
-CORS(app)
 UPLOAD_FOLDER = "uploads"
-init_db()
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ------------------ UTILITAS PDF ------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+CORS(app)
 
 def remove_illegal_chars(text):
     return re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', "", text)
@@ -82,63 +59,29 @@ def extract_abstract(text):
         else:
             return " ".join(text.split()[:300])
 
-# ------------------ PROSES PDF + API AURORA ------------------
-
-# def classify_with_aurora(abstract):
-#     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
-#     headers = {"Content-Type": "application/json"}
-#     payload = json.dumps({"text": abstract})
-
-#     try:
-#         response = requests.post(url, headers=headers, data=payload)
-#         if response.status_code == 200:
-#             predictions = response.json().get("predictions", [])
-#             filtered = [
-#                 {
-#                     "label": p["sdg"]["label"],
-#                     "score": round(p["prediction"] * 100, 2)
-#                 }
-#                 for p in predictions if p["prediction"] >= 0.15
-#             ]
-#             logging.info("✅ SDG Classification Result:")
-#             for item in filtered:
-#                 logging.info(f"- {item['label']}: {item['score']}%")
-#             return filtered
-#         else:
-#             logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
-#             return []
-#     except Exception as e:
-#         logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
-#         return []
-
 def classify_with_aurora(abstract):
     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
     headers = {"Content-Type": "application/json"}
-    payload = json.dumps({"text": abstract})
+    payload = {"text": abstract}
 
     try:
-        response = requests.post(url, headers=headers, data=payload)
-        if response.status_code == 200:
-            predictions = response.json().get("predictions", [])
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        predictions = response.json().get("predictions", [])
 
-            all_sdg_scores = {
-                p["sdg"]["label"]: round(p["prediction"] * 100, 2)
-                for p in predictions
-            }
+        all_sdg_scores = {
+            p["sdg"]["label"]: round(p["prediction"] * 100, 2)
+            for p in predictions
+        }
 
-            # Logging top N atau semua
-            logging.info("✅ SDG Classification (All):")
-            for label, score in sorted(all_sdg_scores.items(), key=lambda x: x[1], reverse=True):
-                logging.info(f"- {label}: {score}%")
+        logger.info("✅ SDG Classification (All):")
+        for label, score in sorted(all_sdg_scores.items(), key=lambda x: x[1], reverse=True):
+            logger.info(f"- {label}: {score}%")
 
-            return all_sdg_scores  # ← dikembalikan dalam format dict langsung
-        else:
-            logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
-            return {}
+        return all_sdg_scores
     except Exception as e:
-        logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
+        logger.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
         return {}
-
 
 def process_single_pdf(pdf_path):
     try:
@@ -151,10 +94,8 @@ def process_single_pdf(pdf_path):
             "sdg": sdg_result
         }
     except Exception as e:
-        logging.error(f"❌ Error di process_single_pdf: {str(e)}")
+        logger.error(f"❌ Error di process_single_pdf: {str(e)}")
         return {"status": "error", "message": str(e)}
-
-# ------------------ ROUTES ------------------
 
 @app.route("/", methods=["GET"])
 def index():
@@ -173,7 +114,6 @@ def extract_abstract_api():
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
 
-    # 🔴 Log upload setelah file disimpan
     log_upload(filename, request.remote_addr)
 
     result = process_single_pdf(file_path)
@@ -183,7 +123,7 @@ def extract_abstract_api():
 @app.route("/forminator-webhook", methods=["POST"])
 def forminator_webhook():
     data = request.json
-    logging.debug("📥 Received data from Forminator: %s", data)
+    logger.debug("📥 Received data from Forminator: %s", data)
 
     upload_data = data.get("upload_1")
     if isinstance(upload_data, dict):
@@ -208,7 +148,6 @@ def forminator_webhook():
         with open(file_path, "wb") as f:
             f.write(response.content)
 
-        # 🔴 Log upload setelah file disimpan
         log_upload(filename, request.remote_addr)
 
         result = process_single_pdf(file_path)
@@ -216,76 +155,9 @@ def forminator_webhook():
 
         return jsonify(result)
     except Exception as e:
-        logging.error(f"❌ Error in webhook: {str(e)}")
+        logger.error(f"❌ Error in webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# @app.route("/admin")
-# def admin_page():
-#     total, latest, recent = get_insight()
-#     html = f"""
-#     <h2>📊 Platform Insight</h2>
-#     <p><strong>Total uploads:</strong> {total}</p>
-#     <p><strong>Last upload:</strong> {latest}</p>
-#     <h3>🕘 Last 10 uploads:</h3>
-#     <ul>
-#     """
-#     for filename, time, ip in recent:
-#         html += f"<li>{time} — {filename} ({ip})</li>"
-#     html += "</ul>"
-#     return html
-
-@app.route("/download-report", methods=["POST"])
-def download_report():
-    data = request.get_json()
-    abstract = data.get("abstract", "")
-    sdg = data.get("sdg", {})
-
-    try:
-        # Generate PDF in memory
-        buffer = BytesIO()
-        p = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
-        y = height - 40
-
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(50, y, "SDG Classification Report")
-        y -= 30
-
-        p.setFont("Helvetica", 12)
-        p.drawString(50, y, "Abstract:")
-        y -= 20
-
-        for line in abstract.split('\n'):
-            for chunk in [line[i:i+100] for i in range(0, len(line), 100)]:
-                p.drawString(60, y, chunk)
-                y -= 15
-                if y < 50:
-                    p.showPage()
-                    y = height - 40
-
-        y -= 20
-        p.setFont("Helvetica", 12)
-        p.drawString(50, y, "SDG Scores:")
-        y -= 20
-
-        sorted_sdg = sorted(sdg.items(), key=lambda x: x[1], reverse=True)
-        for label, score in sorted_sdg:
-            p.drawString(60, y, f"{label}: {score}%")
-            y -= 15
-            if y < 50:
-                p.showPage()
-                y = height - 40
-
-        p.save()
-        buffer.seek(0)
-
-        return send_file(buffer, mimetype='application/pdf',
-                         as_attachment=True, download_name="sdg_report.pdf")
-
-    except Exception as e:
-        logging.error(f"❌ Error generating report: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-        
 @app.route("/admin", methods=["GET"])
 def admin_dashboard():
     total, last_upload, recent = get_insight()
@@ -342,8 +214,7 @@ def admin_dashboard():
     """
     return render_template_string(html)
 
-# ------------------ RUN ------------------
-
 if __name__ == "__main__":
+    init_db()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
