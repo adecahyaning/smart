@@ -1,6 +1,7 @@
 from insight_db import init_db, log_upload, get_insight
 from flask_cors import CORS
 from flask import Flask, request, jsonify
+from flask import render_template_string
 import os
 import psycopg2
 import fitz
@@ -79,6 +80,33 @@ def extract_abstract(text):
 
 # ------------------ PROSES PDF + API AURORA ------------------
 
+# def classify_with_aurora(abstract):
+#     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
+#     headers = {"Content-Type": "application/json"}
+#     payload = json.dumps({"text": abstract})
+
+#     try:
+#         response = requests.post(url, headers=headers, data=payload)
+#         if response.status_code == 200:
+#             predictions = response.json().get("predictions", [])
+#             filtered = [
+#                 {
+#                     "label": p["sdg"]["label"],
+#                     "score": round(p["prediction"] * 100, 2)
+#                 }
+#                 for p in predictions if p["prediction"] >= 0.15
+#             ]
+#             logging.info("✅ SDG Classification Result:")
+#             for item in filtered:
+#                 logging.info(f"- {item['label']}: {item['score']}%")
+#             return filtered
+#         else:
+#             logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
+#             return []
+#     except Exception as e:
+#         logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
+#         return []
+
 def classify_with_aurora(abstract):
     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
     headers = {"Content-Type": "application/json"}
@@ -88,23 +116,25 @@ def classify_with_aurora(abstract):
         response = requests.post(url, headers=headers, data=payload)
         if response.status_code == 200:
             predictions = response.json().get("predictions", [])
-            filtered = [
-                {
-                    "label": p["sdg"]["label"],
-                    "score": round(p["prediction"] * 100, 2)
-                }
-                for p in predictions if p["prediction"] >= 0.15
-            ]
-            logging.info("✅ SDG Classification Result:")
-            for item in filtered:
-                logging.info(f"- {item['label']}: {item['score']}%")
-            return filtered
+
+            all_sdg_scores = {
+                p["sdg"]["label"]: round(p["prediction"] * 100, 2)
+                for p in predictions
+            }
+
+            # Logging top N atau semua
+            logging.info("✅ SDG Classification (All):")
+            for label, score in sorted(all_sdg_scores.items(), key=lambda x: x[1], reverse=True):
+                logging.info(f"- {label}: {score}%")
+
+            return all_sdg_scores  # ← dikembalikan dalam format dict langsung
         else:
             logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
-            return []
+            return {}
     except Exception as e:
         logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
-        return []
+        return {}
+
 
 def process_single_pdf(pdf_path):
     try:
@@ -185,20 +215,78 @@ def forminator_webhook():
         logging.error(f"❌ Error in webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/admin")
-def admin_page():
-    total, latest, recent = get_insight()
+# @app.route("/admin")
+# def admin_page():
+#     total, latest, recent = get_insight()
+#     html = f"""
+#     <h2>📊 Platform Insight</h2>
+#     <p><strong>Total uploads:</strong> {total}</p>
+#     <p><strong>Last upload:</strong> {latest}</p>
+#     <h3>🕘 Last 10 uploads:</h3>
+#     <ul>
+#     """
+#     for filename, time, ip in recent:
+#         html += f"<li>{time} — {filename} ({ip})</li>"
+#     html += "</ul>"
+#     return html
+
+@app.route("/admin", methods=["GET"])
+def admin_dashboard():
+    total, last_upload, recent = get_insight()
+
     html = f"""
-    <h2>📊 Platform Insight</h2>
-    <p><strong>Total uploads:</strong> {total}</p>
-    <p><strong>Last upload:</strong> {latest}</p>
-    <h3>🕘 Last 10 uploads:</h3>
-    <ul>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Platform Insight</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 40px;
+                background-color: #f9f9f9;
+                color: #333;
+            }}
+            h1 {{
+                color: #4A148C;
+            }}
+            .section {{
+                background-color: #fff;
+                padding: 20px;
+                margin-bottom: 30px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            }}
+            ul {{
+                padding-left: 20px;
+            }}
+            li {{
+                margin-bottom: 10px;
+            }}
+            .icon {{
+                font-size: 1.3em;
+                margin-right: 5px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="section">
+            <h1>📊 Platform Insight</h1>
+            <p><strong>Total uploads:</strong> {total}</p>
+            <p><strong>Last upload:</strong> {last_upload}</p>
+        </div>
+
+        <div class="section">
+            <h2 class="icon">🕒 Last 10 uploads:</h2>
+            <ul>
+                {''.join(f'<li>{t} — {f} ({ip})</li>' for t, f, ip in recent)}
+            </ul>
+
+gmn caranya 
+        </div>
+    </body>
+    </html>
     """
-    for filename, time, ip in recent:
-        html += f"<li>{time} — {filename} ({ip})</li>"
-    html += "</ul>"
-    return html
+    return render_template_string(html)
 
 # ------------------ RUN ------------------
 
