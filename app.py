@@ -80,6 +80,33 @@ def extract_abstract(text):
 
 # ------------------ PROSES PDF + API AURORA ------------------
 
+# def classify_with_aurora(abstract):
+#     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
+#     headers = {"Content-Type": "application/json"}
+#     payload = json.dumps({"text": abstract})
+
+#     try:
+#         response = requests.post(url, headers=headers, data=payload)
+#         if response.status_code == 200:
+#             predictions = response.json().get("predictions", [])
+#             filtered = [
+#                 {
+#                     "label": p["sdg"]["label"],
+#                     "score": round(p["prediction"] * 100, 2)
+#                 }
+#                 for p in predictions if p["prediction"] >= 0.15
+#             ]
+#             logging.info("✅ SDG Classification Result:")
+#             for item in filtered:
+#                 logging.info(f"- {item['label']}: {item['score']}%")
+#             return filtered
+#         else:
+#             logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
+#             return []
+#     except Exception as e:
+#         logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
+#         return []
+
 def classify_with_aurora(abstract):
     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
     headers = {"Content-Type": "application/json"}
@@ -89,23 +116,25 @@ def classify_with_aurora(abstract):
         response = requests.post(url, headers=headers, data=payload)
         if response.status_code == 200:
             predictions = response.json().get("predictions", [])
-            filtered = [
-                {
-                    "label": p["sdg"]["label"],
-                    "score": round(p["prediction"] * 100, 2)
-                }
-                for p in predictions if p["prediction"] >= 0.15
-            ]
-            logging.info("✅ SDG Classification Result:")
-            for item in filtered:
-                logging.info(f"- {item['label']}: {item['score']}%")
-            return filtered
+
+            all_sdg_scores = {
+                p["sdg"]["label"]: round(p["prediction"] * 100, 2)
+                for p in predictions
+            }
+
+            # Logging top N atau semua
+            logging.info("✅ SDG Classification (All):")
+            for label, score in sorted(all_sdg_scores.items(), key=lambda x: x[1], reverse=True):
+                logging.info(f"- {label}: {score}%")
+
+            return all_sdg_scores  # ← dikembalikan dalam format dict langsung
         else:
             logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
-            return []
+            return {}
     except Exception as e:
         logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
-        return []
+        return {}
+
 
 def process_single_pdf(pdf_path):
     try:
