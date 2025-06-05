@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import requests
 
+# Konfigurasi koneksi ke database PostgreSQL dari environment variables
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
     "port": os.getenv("PGPORT"),
@@ -15,11 +16,12 @@ DB_CONFIG = {
 def get_connection():
     return psycopg2.connect(**DB_CONFIG)
 
+
 def init_db():
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS uploads (
+                CREATE TABLE IF NOT EXISTS uploads_new (
                     id SERIAL PRIMARY KEY,
                     filename TEXT,
                     upload_time TIMESTAMP,
@@ -28,6 +30,7 @@ def init_db():
                 )
             ''')
         conn.commit()
+
 
 def get_location_from_ip(ip_address):
     try:
@@ -55,7 +58,7 @@ def log_upload(filename, ip_address):
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO uploads (filename, upload_time, ip, location) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO uploads_new (filename, upload_time, ip, location) VALUES (%s, %s, %s, %s)",
                 (filename, datetime.now(), ip_address, location_str)
             )
         conn.commit()
@@ -64,13 +67,10 @@ def log_upload(filename, ip_address):
 def get_insight():
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*), MAX(upload_time) FROM uploads")
+            cursor.execute("SELECT COUNT(*), MAX(upload_time) FROM uploads_new")
             total, latest = cursor.fetchone()
 
-            cursor.execute("SELECT filename, upload_time, ip, location FROM uploads ORDER BY upload_time DESC LIMIT 10")
+            cursor.execute("SELECT filename, upload_time, ip, location FROM uploads_new ORDER BY upload_time DESC LIMIT 10")
             recent = cursor.fetchall()
 
     return total, latest, recent
-
-
-
