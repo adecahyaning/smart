@@ -1,6 +1,6 @@
 from insight_db import init_db, log_upload, get_insight
 from flask_cors import CORS
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, request, send_file
 from flask import render_template_string
 import os
 import psycopg2
@@ -10,6 +10,8 @@ import logging
 import requests
 import json
 from werkzeug.utils import secure_filename
+from fpdf import FPDF
+import io
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -286,6 +288,30 @@ def admin_dashboard():
     </html>
     """
     return render_template_string(html)
+
+@app.route('/download-result', methods=['POST'])
+def download_result():
+    data = request.get_json()
+    abstract = data.get('abstract', '')
+    sdg = data.get('sdg', {})
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    pdf.multi_cell(0, 10, f"Abstract:\n{abstract}\n")
+    pdf.ln(5)
+    pdf.cell(0, 10, "SDG Classification Results:", ln=True)
+
+    for label, score in sdg.items():
+        pdf.cell(0, 10, f"{label}: {score}%", ln=True)
+
+    # Save PDF to memory
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+
+    return send_file(buffer, as_attachment=True, download_name="sdg_result.pdf", mimetype='application/pdf')
 
 # ------------------ RUN ------------------
 
