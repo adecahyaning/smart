@@ -1,6 +1,7 @@
 import psycopg2
 from datetime import datetime
 import os
+import requests
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -46,3 +47,18 @@ def get_insight():
             recent = cursor.fetchall()
 
     return total, latest, recent
+
+def get_location_from_ip(ip_address):
+    try:
+        response = requests.get(f"http://ip-api.com/json/{ip_address}")
+        data = response.json()
+        if data["status"] == "success":
+            return {
+                "country": data.get("country"),
+                "region": data.get("regionName"),
+                "city": data.get("city"),
+                "isp": data.get("isp")
+            }
+    except:
+        pass
+    return {}
