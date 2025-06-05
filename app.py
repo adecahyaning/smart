@@ -217,20 +217,63 @@ def forminator_webhook():
         logging.error(f"❌ Error in webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# @app.route("/admin")
-# def admin_page():
-#     total, latest, recent = get_insight()
+
+# @app.route("/admin", methods=["GET"])
+# def admin_dashboard():
+#     total, last_upload, recent = get_insight()
+
 #     html = f"""
-#     <h2>📊 Platform Insight</h2>
-#     <p><strong>Total uploads:</strong> {total}</p>
-#     <p><strong>Last upload:</strong> {latest}</p>
-#     <h3>🕘 Last 10 uploads:</h3>
-#     <ul>
+#     <!DOCTYPE html>
+#     <html>
+#     <head>
+#         <title>Platform Insight</title>
+#         <style>
+#             body {{
+#                 font-family: Arial, sans-serif;
+#                 margin: 40px;
+#                 background-color: #f9f9f9;
+#                 color: #333;
+#             }}
+#             h1 {{
+#                 color: #4A148C;
+#             }}
+#             .section {{
+#                 background-color: #fff;
+#                 padding: 20px;
+#                 margin-bottom: 30px;
+#                 border-radius: 8px;
+#                 box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+#             }}
+#             ul {{
+#                 padding-left: 20px;
+#             }}
+#             li {{
+#                 margin-bottom: 10px;
+#             }}
+#             .icon {{
+#                 font-size: 1.3em;
+#                 margin-right: 5px;
+#             }}
+#         </style>
+#     </head>
+#     <body>
+#         <div class="section">
+#             <h1>📊 Platform Insight</h1>
+#             <p><strong>Total uploads:</strong> {total}</p>
+#             <p><strong>Last upload:</strong> {last_upload}</p>
+#         </div>
+
+#         <div class="section">
+#             <h2 class="icon">🕒 Last 10 uploads:</h2>
+#             <ul>
+#                 {''.join(f'<li>{t} — {f} ({ip})</li>' for t, f, ip in recent)}
+#             </ul>
+
+#         </div>
+#     </body>
+#     </html>
 #     """
-#     for filename, time, ip in recent:
-#         html += f"<li>{time} — {filename} ({ip})</li>"
-#     html += "</ul>"
-#     return html
+#     return render_template_string(html)
 
 @app.route("/admin", methods=["GET"])
 def admin_dashboard():
@@ -264,10 +307,6 @@ def admin_dashboard():
             li {{
                 margin-bottom: 10px;
             }}
-            .icon {{
-                font-size: 1.3em;
-                margin-right: 5px;
-            }}
         </style>
     </head>
     <body>
@@ -278,16 +317,16 @@ def admin_dashboard():
         </div>
 
         <div class="section">
-            <h2 class="icon">🕒 Last 10 uploads:</h2>
+            <h2>🕒 Last 10 uploads:</h2>
             <ul>
-                {''.join(f'<li>{t} — {f} ({ip})</li>' for t, f, ip in recent)}
+                {''.join(f'<li>{t} — {f} ({ip}) - {loc}</li>' for f, t, ip, loc in recent)}
             </ul>
-
         </div>
     </body>
     </html>
     """
     return render_template_string(html)
+
 
 @app.route('/download-result', methods=['POST'])
 def download_result():
