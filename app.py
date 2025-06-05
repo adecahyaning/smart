@@ -307,9 +307,12 @@ def download_result():
         pdf.cell(0, 10, f"{label}: {score}%", ln=True)
 
     # Save PDF to memory
+    # Save PDF to memory (fix with 'S' mode)
     buffer = io.BytesIO()
-    pdf.output(buffer)
+    pdf_output = pdf.output(dest='S').encode('latin1')
+    buffer.write(pdf_output)
     buffer.seek(0)
+
 
     return send_file(buffer, as_attachment=True, download_name="sdg_result.pdf", mimetype='application/pdf')
 
