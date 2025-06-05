@@ -4,3 +4,4 @@ PyMuPDF
 flask-cors
 psycopg2-binary
 reportlab
+fpdf==1.7.2
