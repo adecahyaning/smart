@@ -23,30 +23,11 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     filename TEXT,
                     upload_time TIMESTAMP,
-                    ip TEXT
+                    ip TEXT,
+                    location TEXT
                 )
             ''')
         conn.commit()
-
-def log_upload(filename, ip_address):
-    with get_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "INSERT INTO uploads (filename, upload_time, ip) VALUES (%s, %s, %s)",
-                (filename, datetime.now(), ip_address)
-            )
-        conn.commit()
-
-def get_insight():
-    with get_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*), MAX(upload_time) FROM uploads")
-            total, latest = cursor.fetchone()
-
-            cursor.execute("SELECT filename, upload_time, ip FROM uploads ORDER BY upload_time DESC LIMIT 10")
-            recent = cursor.fetchall()
-
-    return total, latest, recent
 
 def get_location_from_ip(ip_address):
     try:
@@ -62,3 +43,34 @@ def get_location_from_ip(ip_address):
     except:
         pass
     return {}
+
+
+def log_upload(filename, ip_address):
+    location_data = get_location_from_ip(ip_address)
+    location_str = ""
+    if location_data:
+        parts = [location_data.get("city"), location_data.get("region"), location_data.get("country")]
+        location_str = ", ".join([p for p in parts if p])
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO uploads (filename, upload_time, ip, location) VALUES (%s, %s, %s, %s)",
+                (filename, datetime.now(), ip_address, location_str)
+            )
+        conn.commit()
+
+
+def get_insight():
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*), MAX(upload_time) FROM uploads")
+            total, latest = cursor.fetchone()
+
+            cursor.execute("SELECT filename, upload_time, ip, location FROM uploads ORDER BY upload_time DESC LIMIT 10")
+            recent = cursor.fetchall()
+
+    return total, latest, recent
+
+
+
