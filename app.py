@@ -1,7 +1,6 @@
 from insight_db import init_db, log_upload, get_insight
 from flask_cors import CORS
-from flask import Flask, request, jsonify, request, send_file
-from flask import render_template_string
+from flask import Flask, request, jsonify, request, send_file, render_template_string
 import os
 import psycopg2
 import fitz
@@ -12,6 +11,13 @@ import json
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 import io
+from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.colors import HexColor
+from reportlab.lib.units import inch
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -218,63 +224,6 @@ def forminator_webhook():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# @app.route("/admin", methods=["GET"])
-# def admin_dashboard():
-#     total, last_upload, recent = get_insight()
-
-#     html = f"""
-#     <!DOCTYPE html>
-#     <html>
-#     <head>
-#         <title>Platform Insight</title>
-#         <style>
-#             body {{
-#                 font-family: Arial, sans-serif;
-#                 margin: 40px;
-#                 background-color: #f9f9f9;
-#                 color: #333;
-#             }}
-#             h1 {{
-#                 color: #4A148C;
-#             }}
-#             .section {{
-#                 background-color: #fff;
-#                 padding: 20px;
-#                 margin-bottom: 30px;
-#                 border-radius: 8px;
-#                 box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-#             }}
-#             ul {{
-#                 padding-left: 20px;
-#             }}
-#             li {{
-#                 margin-bottom: 10px;
-#             }}
-#             .icon {{
-#                 font-size: 1.3em;
-#                 margin-right: 5px;
-#             }}
-#         </style>
-#     </head>
-#     <body>
-#         <div class="section">
-#             <h1>📊 Platform Insight</h1>
-#             <p><strong>Total uploads:</strong> {total}</p>
-#             <p><strong>Last upload:</strong> {last_upload}</p>
-#         </div>
-
-#         <div class="section">
-#             <h2 class="icon">🕒 Last 10 uploads:</h2>
-#             <ul>
-#                 {''.join(f'<li>{t} — {f} ({ip})</li>' for t, f, ip in recent)}
-#             </ul>
-
-#         </div>
-#     </body>
-#     </html>
-#     """
-#     return render_template_string(html)
-
 @app.route("/admin", methods=["GET"])
 def admin_dashboard():
     total, last_upload, recent = get_insight()
@@ -328,32 +277,118 @@ def admin_dashboard():
     return render_template_string(html)
 
 
-@app.route('/download-result', methods=['POST'])
+# @app.route('/download-result', methods=['POST'])
+# def download_result():
+#     data = request.get_json()
+#     abstract = data.get('abstract', '')
+#     sdg = data.get('sdg', {})
+
+#     pdf = FPDF()
+#     pdf.add_page()
+#     pdf.set_font("Arial", size=12)
+
+#     pdf.multi_cell(0, 10, f"Abstract:\n{abstract}\n")
+#     pdf.ln(5)
+#     pdf.cell(0, 10, "SDG Classification Results:", ln=True)
+
+#     for label, score in sdg.items():
+#         pdf.cell(0, 10, f"{label}: {score}%", ln=True)
+
+#     # Save PDF to memory
+#     # Save PDF to memory (fix with 'S' mode)
+#     buffer = io.BytesIO()
+#     pdf_output = pdf.output(dest='S').encode('latin1')
+#     buffer.write(pdf_output)
+#     buffer.seek(0)
+
+
+#     return send_file(buffer, as_attachment=True, download_name="sdg_result.pdf", mimetype='application/pdf')
+
+@app.route('/download_result', methods=['POST'])
 def download_result():
     data = request.get_json()
-    abstract = data.get('abstract', '')
-    sdg = data.get('sdg', {})
+    abstract = data.get("abstract", "")
+    sdg_scores = data.get("sdg_scores", {})
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    # Prepare PDF in memory
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
 
-    pdf.multi_cell(0, 10, f"Abstract:\n{abstract}\n")
-    pdf.ln(5)
-    pdf.cell(0, 10, "SDG Classification Results:", ln=True)
+    title_style = ParagraphStyle(
+        name="Title",
+        fontSize=18,
+        leading=22,
+        alignment=TA_CENTER,
+        textColor=HexColor("#31572C"),
+        spaceAfter=20
+    )
 
-    for label, score in sdg.items():
-        pdf.cell(0, 10, f"{label}: {score}%", ln=True)
+    normal_style = styles["Normal"]
+    normal_style.spaceAfter = 12
+    justified_style = ParagraphStyle(
+        name="Justified",
+        parent=normal_style,
+        alignment=TA_JUSTIFY,
+        fontSize=10
+    )
 
-    # Save PDF to memory
-    # Save PDF to memory (fix with 'S' mode)
-    buffer = io.BytesIO()
-    pdf_output = pdf.output(dest='S').encode('latin1')
-    buffer.write(pdf_output)
+    elements = []
+
+    # Title
+    elements.append(Paragraph("SDG Mapping and Assessment Report", title_style))
+    elements.append(Spacer(1, 12))
+
+    # General Notes
+    notes = """
+    This application performs Sustainable Development Goal (SDG) classification based on the abstract extracted from a PDF document.
+    The document is parsed using the fitz library (PyMuPDF), which allows structured reading and text extraction.<br/><br/>
+    The application first attempts to detect and extract the abstract section from the PDF. If an abstract is not detected, 
+    the fallback mechanism extracts the first 500 words from the document as a proxy for the abstract.<br/><br/>
+    The extracted text is then analyzed using the Aurora SDG multi-label mBERT model (https://aurora-sdg.labs.vu.nl/sdg-classifier/text). 
+    This model performs multi-label classification across all 17 Sustainable Development Goals (SDGs).<br/><br/>
+    The output consists of percentage scores (ranging from 0% to 100%) for each SDG, indicating the degree of relevance between the input text and each goal. 
+    Multiple SDGs can be associated with a single document depending on the model’s confidence levels.<br/><br/>
+    This abstract-based analysis enables efficient and scalable SDG classification.
+    """
+    elements.append(Paragraph(notes, justified_style))
+    elements.append(Spacer(1, 18))
+
+    # Abstract
+    elements.append(Paragraph("<b>Detected Abstract</b>", normal_style))
+    elements.append(Paragraph(abstract, justified_style))
+    elements.append(Spacer(1, 18))
+
+    # SDG Classification Results
+    elements.append(Paragraph("<b>SDG Classification Results</b>", normal_style))
+
+    sorted_scores = sorted(sdg_scores.items(), key=lambda x: x[1], reverse=True)
+    table_data = [["SDG", "Relevance (%)"]] + [[k, f"{v:.2f}%"] for k, v in sorted_scores]
+
+    table = Table(table_data, colWidths=[3*inch, 2*inch])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#31572C")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor("#F5F5F5"), HexColor("#FFFFFF")]),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC"))
+    ]))
+
+    elements.append(table)
+
+    # Build and send PDF
+    doc.build(elements)
     buffer.seek(0)
 
-
-    return send_file(buffer, as_attachment=True, download_name="sdg_result.pdf", mimetype='application/pdf')
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="sdg_report.pdf",
+        mimetype="application/pdf"
+    )
 
 # ------------------ RUN ------------------
 
