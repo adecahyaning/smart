@@ -18,6 +18,11 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.colors import HexColor
 from reportlab.lib.units import inch
+from reportlab.pdfbase import ttfonts
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+
+pdfmetrics.registerFont(TTFont("Cambria", "static/fonts/cambria.ttf"))
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -308,12 +313,13 @@ def admin_dashboard():
 def download_result():
     data = request.get_json()
     abstract = data.get("abstract", "")
-    sdg_scores = data.get("sdg_scores", {})
+    sdg_scores = data.get("sdg", {})
 
     # Prepare PDF in memory
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
+
 
     title_style = ParagraphStyle(
         name="Title",
@@ -330,8 +336,10 @@ def download_result():
         name="Justified",
         parent=normal_style,
         alignment=TA_JUSTIFY,
-        fontSize=10
+        fontSize=10,
+        fontName="Cambria"
     )
+    normal_style.fontName = "Cambria"
 
     elements = []
 
