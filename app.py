@@ -276,8 +276,8 @@ def download_result():
         )
     styles = getSampleStyleSheet()
 
-    normal_style.fontName = "Cambria"
     normal_style = styles["Normal"]
+    normal_style.fontName = "Cambria"
     normal_style.spaceAfter = 12
 
     justified_style = ParagraphStyle(
