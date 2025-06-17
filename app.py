@@ -1,26 +1,35 @@
-from insight_db import init_db, log_upload, get_insight
-from flask_cors import CORS
-from flask import Flask, request, jsonify, request, send_file, render_template_string
 import os
-import psycopg2
-import fitz
 import re
-import logging
-import requests
+import io
 import json
+import logging
+from io import BytesIO
+
+import fitz  # PyMuPDF
+import psycopg2
+import requests
+from flask import Flask, request, jsonify, send_file, render_template_string
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
-import io
-from io import BytesIO
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+# ==== ReportLab for PDF Generation ====
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table,
+    TableStyle, Image, HRFlowable
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.colors import HexColor
 from reportlab.lib.units import inch
-from reportlab.pdfbase import ttfonts
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+# ==== Local Module ====
+from insight_db import init_db, log_upload, get_insight
+
 
 pdfmetrics.registerFont(TTFont("Cambria", "static/fonts/cambria.ttf"))
 
@@ -60,6 +69,44 @@ def extract_text_from_pdf(pdf_path):
     text = extract_text_with_fitz(pdf_path)
     return remove_illegal_chars(text)
 
+def draw_header(canvas, doc):
+    # Atur posisi logo (dari kiri dan dari bawah)
+    logo_path = "uploads/logo_header.jpg"
+    logo_width = 3.6 * inch
+    logo_height = 0.88 * inch
+    page_width, page_height = A4
+    x = (page_width - logo_width) / 2
+    y = page_height - logo_height - 0.15 * inch  
+
+    canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True)
+
+    text = "SDG Mapping and Assessment Report"
+    canvas.setFont("Times-Bold", 18)
+    width = canvas.stringWidth(text, "Times-Bold", 18)
+    page_width = doc.pagesize[0]
+    x = (page_width - width) / 2
+    y = doc.pagesize[1] - 1.4 * inch  # atur jarak dari atas
+
+    canvas.drawString(x, y, text)
+    canvas.setLineWidth(1)
+    canvas.line(x, y - 2, x + width, y - 2) 
+
+
+def draw_footer(canvas, doc):
+    footer_path = "uploads/footer.png"
+    footer_width = doc.pagesize[0]
+    footer_height = 0.9 * inch  
+
+    x = 0
+    y = 0  # posisi paling bawah halaman
+
+    canvas.drawImage(footer_path, x, y, width=footer_width, height=footer_height, preserveAspectRatio=True, mask='auto')
+
+def draw_first_page(canvas, doc):
+    draw_header(canvas, doc)
+    draw_footer(canvas, doc)
+
+
 def extract_abstract(text):
     abstract_match = re.search(r"(?i)\bA\s*B\s*S\s*T\s*R\s*A\s*C\s*T\b", text)
     stop_heading_pattern = (
@@ -90,35 +137,6 @@ def extract_abstract(text):
                 return " ".join(pre.split()[-300:])
         else:
             return " ".join(text.split()[:300])
-
-# ------------------ PROSES PDF + API AURORA ------------------
-
-# def classify_with_aurora(abstract):
-#     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
-#     headers = {"Content-Type": "application/json"}
-#     payload = json.dumps({"text": abstract})
-
-#     try:
-#         response = requests.post(url, headers=headers, data=payload)
-#         if response.status_code == 200:
-#             predictions = response.json().get("predictions", [])
-#             filtered = [
-#                 {
-#                     "label": p["sdg"]["label"],
-#                     "score": round(p["prediction"] * 100, 2)
-#                 }
-#                 for p in predictions if p["prediction"] >= 0.15
-#             ]
-#             logging.info("✅ SDG Classification Result:")
-#             for item in filtered:
-#                 logging.info(f"- {item['label']}: {item['score']}%")
-#             return filtered
-#         else:
-#             logging.error(f"❌ Gagal panggil API Aurora: {response.status_code}")
-#             return []
-#     except Exception as e:
-#         logging.error(f"❌ Error saat memanggil API Aurora: {str(e)}")
-#         return []
 
 def classify_with_aurora(abstract):
     url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
@@ -189,45 +207,6 @@ def extract_abstract_api():
     os.remove(file_path)
     return jsonify(result)
 
-@app.route("/forminator-webhook", methods=["POST"])
-def forminator_webhook():
-    data = request.json
-    logging.debug("📥 Received data from Forminator: %s", data)
-
-    upload_data = data.get("upload_1")
-    if isinstance(upload_data, dict):
-        file_url = upload_data.get("file_url")
-    elif isinstance(upload_data, str):
-        file_url = upload_data
-    else:
-        file_url = None
-
-    if not file_url:
-        return jsonify({"status": "error", "message": "No valid file URL provided."}), 400
-
-    file_url = file_url.replace("http://", "https://")
-
-    try:
-        response = requests.get(file_url)
-        if response.status_code != 200:
-            return jsonify({"status": "error", "message": "Failed to download file."}), 400
-
-        filename = "uploaded.pdf"
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        with open(file_path, "wb") as f:
-            f.write(response.content)
-
-        # 🔴 Log upload setelah file disimpan
-        log_upload(filename, request.remote_addr)
-
-        result = process_single_pdf(file_path)
-        os.remove(file_path)
-
-        return jsonify(result)
-    except Exception as e:
-        logging.error(f"❌ Error in webhook: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 
 @app.route("/admin", methods=["GET"])
 def admin_dashboard():
@@ -282,33 +261,6 @@ def admin_dashboard():
     return render_template_string(html)
 
 
-# @app.route('/download-result', methods=['POST'])
-# def download_result():
-#     data = request.get_json()
-#     abstract = data.get('abstract', '')
-#     sdg = data.get('sdg', {})
-
-#     pdf = FPDF()
-#     pdf.add_page()
-#     pdf.set_font("Arial", size=12)
-
-#     pdf.multi_cell(0, 10, f"Abstract:\n{abstract}\n")
-#     pdf.ln(5)
-#     pdf.cell(0, 10, "SDG Classification Results:", ln=True)
-
-#     for label, score in sdg.items():
-#         pdf.cell(0, 10, f"{label}: {score}%", ln=True)
-
-#     # Save PDF to memory
-#     # Save PDF to memory (fix with 'S' mode)
-#     buffer = io.BytesIO()
-#     pdf_output = pdf.output(dest='S').encode('latin1')
-#     buffer.write(pdf_output)
-#     buffer.seek(0)
-
-
-#     return send_file(buffer, as_attachment=True, download_name="sdg_result.pdf", mimetype='application/pdf')
-
 @app.route('/download_result', methods=['POST'])
 def download_result():
     data = request.get_json()
@@ -317,37 +269,42 @@ def download_result():
 
     # Prepare PDF in memory
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            topMargin=1.8* inch  # atur agar isi tidak nabrak header
+        )
     styles = getSampleStyleSheet()
 
-
-    title_style = ParagraphStyle(
-        name="Title",
-        fontSize=18,
-        leading=22,
-        alignment=TA_CENTER,
-        textColor=HexColor("#31572C"),
-        spaceAfter=20
-    )
-
+    normal_style.fontName = "Cambria"
     normal_style = styles["Normal"]
     normal_style.spaceAfter = 12
+
     justified_style = ParagraphStyle(
         name="Justified",
         parent=normal_style,
         alignment=TA_JUSTIFY,
-        fontSize=10,
+        fontSize=11,
         fontName="Cambria"
     )
-    normal_style.fontName = "Cambria"
+
+    heading_style = ParagraphStyle(
+        name="Heading",
+        fontSize=14,
+        leading=16,
+        fontName="Times-Bold",
+        textColor=HexColor("#31572C"),
+        alignment=TA_LEFT,
+        spaceBefore=12,
+        spaceAfter=6
+    )
 
     elements = []
 
     # Title
-    elements.append(Paragraph("SDG Mapping and Assessment Report", title_style))
-    elements.append(Spacer(1, 12))
 
     # General Notes
+    elements.append(Paragraph("General Notes", heading_style))
     notes = """
     This application performs Sustainable Development Goal (SDG) classification based on the abstract extracted from a PDF document.
     The document is parsed using the fitz library (PyMuPDF), which allows structured reading and text extraction.<br/><br/>
@@ -363,12 +320,12 @@ def download_result():
     elements.append(Spacer(1, 18))
 
     # Abstract
-    elements.append(Paragraph("<b>Detected Abstract</b>", normal_style))
+    elements.append(Paragraph("Detected Abstract", heading_style))
     elements.append(Paragraph(abstract, justified_style))
     elements.append(Spacer(1, 18))
 
     # SDG Classification Results
-    elements.append(Paragraph("<b>SDG Classification Results</b>", normal_style))
+    elements.append(Paragraph("SDG Classification Results", heading_style))
 
     sorted_scores = sorted(sdg_scores.items(), key=lambda x: x[1], reverse=True)
     table_data = [["SDG", "Relevance (%)"]] + [[k, f"{v:.2f}%"] for k, v in sorted_scores]
@@ -388,7 +345,7 @@ def download_result():
     elements.append(table)
 
     # Build and send PDF
-    doc.build(elements)
+    doc.build(elements, onFirstPage=draw_first_page, onLaterPages=draw_footer)
     buffer.seek(0)
 
     return send_file(
