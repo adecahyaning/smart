@@ -72,8 +72,8 @@ def extract_text_from_pdf(pdf_path):
 def draw_header(canvas, doc):
     # Atur posisi logo (dari kiri dan dari bawah)
     logo_path = "uploads/logo_header.jpg"
-    logo_width = 3.6 * inch
-    logo_height = 0.88 * inch
+    logo_width = 2.2 * inch
+    logo_height = 0.55 * inch
     page_width, page_height = A4
     x = (page_width - logo_width) / 2
     y = page_height - logo_height - 0.15 * inch  
@@ -273,7 +273,7 @@ def download_result():
     doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
-            topMargin=1.8* inch  # atur agar isi tidak nabrak header
+            topMargin=1* inch  # atur agar isi tidak nabrak header
         )
     doc.title = "SMART SDG Classifier"
     doc.author = "https://super.universitaspertamina.ac.id/index.php/smart/"
@@ -305,6 +305,7 @@ def download_result():
     elements = []
 
     # Title
+    elements.append(Spacer(1, 10))
 
     # General Notes
     elements.append(Paragraph("General Notes", heading_style))
