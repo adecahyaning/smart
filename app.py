@@ -16,7 +16,7 @@ from fpdf import FPDF
 # ==== ReportLab for PDF Generation ====
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
-    TableStyle, Image, HRFlowable
+    TableStyle, Image, HRFlowable, PageBreak
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
@@ -264,6 +264,7 @@ def admin_dashboard():
 @app.route('/download_result', methods=['POST'])
 def download_result():
     data = request.get_json()
+    filename = data.get("filename", "SDGresult").rsplit(".", 1)[0]
     abstract = data.get("abstract", "")
     sdg_scores = data.get("sdg", {})
 
@@ -274,6 +275,8 @@ def download_result():
             pagesize=A4,
             topMargin=1.8* inch  # atur agar isi tidak nabrak header
         )
+    doc.title = "SMART SDG Classifier"
+    doc.author = "https://super.universitaspertamina.ac.id/index.php/smart/"
     styles = getSampleStyleSheet()
 
     normal_style = styles["Normal"]
@@ -318,6 +321,8 @@ def download_result():
     """
     elements.append(Paragraph(notes, justified_style))
     elements.append(Spacer(1, 18))
+    elements.append(PageBreak())
+
 
     # Abstract
     elements.append(Paragraph("Detected Abstract", heading_style))
