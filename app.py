@@ -85,7 +85,7 @@ def draw_header(canvas, doc):
     width = canvas.stringWidth(text, "Times-Bold", 18)
     page_width = doc.pagesize[0]
     x = (page_width - width) / 2
-    y = doc.pagesize[1] - 1.4 * inch  # atur jarak dari atas
+    y = doc.pagesize[1] - 1.1 * inch  # atur jarak dari atas
 
     canvas.drawString(x, y, text)
     canvas.setLineWidth(1)
