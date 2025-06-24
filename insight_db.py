@@ -81,6 +81,6 @@ def alter_table():
         with conn.cursor() as cursor:
             cursor.execute('''
                 ALTER TABLE uploads_new
-                ADD COLUMN IF NOT EXIST SDG INTEGER[]
+                ADD COLUMN IF NOT EXISTS SDG INTEGER[]
             ''')
         conn.commit()
