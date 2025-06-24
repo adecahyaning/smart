@@ -12,6 +12,8 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 # ==== ReportLab for PDF Generation ====
 from reportlab.platypus import (
@@ -250,13 +252,17 @@ def admin_dashboard():
         <div class="section">
             <h1>📊 Platform Insight</h1>
             <p><strong>Total uploads:</strong> {total}</p>
-            <p><strong>Last upload:</strong> {last_upload}</p>
+            # <p><strong>Last upload:</strong> {last_upload}</p>
+            <p><strong>Last upload:</strong> {last_upload.astimezone(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d %H:%M:%S')}</p>
         </div>
 
         <div class="section">
             <h2>🕒 Last 10 uploads:</h2>
             <ul>
-                {''.join(f'<li>{t} — {f} ({ip}) - {loc} — SDG: {sdg if sdg else '-'}</li>' for f, t, ip, loc, sdg in recent)}
+                {''.join(
+                    f'<li>{t.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S")} — {f} ({ip}) - {loc} — SDG: {sdg if sdg else "-"}</li>'
+                    for f, t, ip, loc, sdg in recent
+                )}
             </ul>
         </div>
     </body>
