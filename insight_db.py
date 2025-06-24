@@ -30,8 +30,6 @@ def init_db():
                 )
             ''')
         conn.commit()
-    alter_table()
-
 
 def get_location_from_ip(ip_address):
     try:
@@ -75,12 +73,3 @@ def get_insight():
             recent = cursor.fetchall()
 
     return total, latest, recent
-
-def alter_table():
-    with get_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute('''
-                ALTER TABLE uploads_new
-                ADD COLUMN IF NOT EXISTS SDG INTEGER[]
-            ''')
-        conn.commit()
