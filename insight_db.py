@@ -30,6 +30,7 @@ def init_db():
                 )
             ''')
         conn.commit()
+    alter_table()
 
 
 def get_location_from_ip(ip_address):
@@ -48,7 +49,7 @@ def get_location_from_ip(ip_address):
     return {}
 
 
-def log_upload(filename, ip_address):
+def log_upload(filename, ip_address, sdg):
     location_data = get_location_from_ip(ip_address)
     location_str = ""
     if location_data:
@@ -58,8 +59,8 @@ def log_upload(filename, ip_address):
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO uploads_new (filename, upload_time, ip, location) VALUES (%s, %s, %s, %s)",
-                (filename, datetime.now(), ip_address, location_str)
+                "INSERT INTO uploads_new (filename, upload_time, ip, location, SDG) VALUES (%s, %s, %s, %s, %s)",
+                (filename, datetime.now(), ip_address, location_str, sdg)
             )
         conn.commit()
 
@@ -70,7 +71,16 @@ def get_insight():
             cursor.execute("SELECT COUNT(*), MAX(upload_time) FROM uploads_new")
             total, latest = cursor.fetchone()
 
-            cursor.execute("SELECT filename, upload_time, ip, location FROM uploads_new ORDER BY upload_time DESC LIMIT 10")
+            cursor.execute("SELECT filename, upload_time, ip, location, SDG FROM uploads_new ORDER BY upload_time DESC LIMIT 10")
             recent = cursor.fetchall()
 
     return total, latest, recent
+
+def alter_table():
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('''
+                ALTER TABLE uploads_new
+                ADD COLUMN IF NOT EXIST SDG INTEGER[]
+            ''')
+        conn.commit()
