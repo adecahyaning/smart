@@ -256,7 +256,7 @@ def admin_dashboard():
         <div class="section">
             <h2>🕒 Last 10 uploads:</h2>
             <ul>
-                {''.join(f'<li>{t} — {f} ({ip}) - {loc} — SDG: {sdg if sdg else '-'}</li>' for f, t, ip, loc in recent)}
+                {''.join(f'<li>{t} — {f} ({ip}) - {loc} — SDG: {sdg if sdg else '-'}</li>' for f, t, ip, loc, sdg in recent)}
             </ul>
         </div>
     </body>
