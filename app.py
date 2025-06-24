@@ -204,7 +204,7 @@ def extract_abstract_api():
     sdg_list = []
     if result.get("status") == "success":
         sdg_scores = result.get("sdg", {})
-        sdg_list = [int(sdg.replace("SDG ", "")) for sdg, score in sdg_scores.items() if score > 30]
+        sdg_list = [int(sdg.replace("Goal ", "")) for sdg, score in sdg_scores.items() if score > 30]
 
     log_upload(filename, request.remote_addr, sdg_list)
 
