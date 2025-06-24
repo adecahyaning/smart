@@ -28,7 +28,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # ==== Local Module ====
-from insight_db import init_db, log_upload, get_insight, alter_table
+from insight_db import init_db, log_upload, get_insight
 
 
 pdfmetrics.registerFont(TTFont("Cambria", "static/fonts/cambria.ttf"))
