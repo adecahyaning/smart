@@ -28,7 +28,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # ==== Local Module ====
-from insight_db import init_db, log_upload, get_insight
+from insight_db import init_db, log_upload, get_insight, alter_table
 
 
 pdfmetrics.registerFont(TTFont("Cambria", "static/fonts/cambria.ttf"))
@@ -199,11 +199,15 @@ def extract_abstract_api():
     filename = secure_filename(file.filename)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
-
-    # 🔴 Log upload setelah file disimpan
-    log_upload(filename, request.remote_addr)
-
     result = process_single_pdf(file_path)
+
+    sdg_list = []
+    if result.get("status") == "success":
+        sdg_scores = result.get("sdg", {})
+        sdg_list = [int(sdg.replace("SDG ", "")) for sdg, score in sdg_cores.items() if score > 30]
+
+    log_upload(filename, request.remote_addr, sdg_list)
+
     os.remove(file_path)
     return jsonify(result)
 
@@ -252,7 +256,7 @@ def admin_dashboard():
         <div class="section">
             <h2>🕒 Last 10 uploads:</h2>
             <ul>
-                {''.join(f'<li>{t} — {f} ({ip}) - {loc}</li>' for f, t, ip, loc in recent)}
+                {''.join(f'<li>{t} — {f} ({ip}) - {loc} — SDG: {sdg if sdg else '-'}</li>' for f, t, ip, loc in recent)}
             </ul>
         </div>
     </body>
