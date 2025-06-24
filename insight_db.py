@@ -26,7 +26,8 @@ def init_db():
                     filename TEXT,
                     upload_time TIMESTAMP,
                     ip TEXT,
-                    location TEXT
+                    location TEXT,
+                    sdg INTEGER[]
                 )
             ''')
         conn.commit()
@@ -57,7 +58,7 @@ def log_upload(filename, ip_address, sdg):
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO uploads_new (filename, upload_time, ip, location, SDG) VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO uploads_new (filename, upload_time, ip, location, sdg) VALUES (%s, %s, %s, %s, %s)",
                 (filename, datetime.now(), ip_address, location_str, sdg)
             )
         conn.commit()
