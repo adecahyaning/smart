@@ -422,7 +422,7 @@ def download_result():
     return send_file(
         buffer,
         as_attachment=True,
-        attachment_filename=f"{filename}_sdg_report.pdf",
+        download_name=f"{filename}_sdg_report.pdf",
         mimetype="application/pdf"
     )
 
