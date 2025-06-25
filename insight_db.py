@@ -58,10 +58,17 @@ def log_upload(filename, ip_address, sdg):
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO uploads_new (filename, upload_time, ip, location, sdg) VALUES (%s, %s, %s, %s, %s)",
+                """
+                INSERT INTO uploads_new (filename, upload_time, ip, location, sdg)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                """,
                 (filename, datetime.now(), ip_address, location_str, sdg)
             )
+            submission_id = cursor.fetchone()[0]
         conn.commit()
+        return submission_id
+
 
 
 def get_insight():
@@ -74,3 +81,21 @@ def get_insight():
             recent = cursor.fetchall()
 
     return total, latest, recent
+
+def get_submission_detail(submission_id):
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, filename, upload_time, sdg FROM uploads_new WHERE id = %s",
+                (submission_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "id": row[0],
+                    "filename": row[1],
+                    "created_at": row[2],  # alias upload_time
+                    "sdg": row[3]
+                }
+    return None
+
