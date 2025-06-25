@@ -274,6 +274,10 @@ def admin_dashboard():
 
 @app.route('/download_result', methods=['POST'])
 def download_result():
+    logging.info("📥 POST /download_result called")
+    data = request.get_json()
+    logging.info(f"📥 Payload received: {data}")
+    
     data = request.get_json()
     submission_id = data.get("submission_id")
     if not submission_id:
