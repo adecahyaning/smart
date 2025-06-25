@@ -53,7 +53,7 @@ log.setLevel(logging.DEBUG)
 
 # Inisialisasi Flask
 app = Flask(__name__)
-CORS(app)
+CORS(app, expose_headers=["Content-Disposition"])
 UPLOAD_FOLDER = "uploads"
 init_db()
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
