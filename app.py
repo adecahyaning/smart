@@ -30,7 +30,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # ==== Local Module ====
-from insight_db import init_db, log_upload, get_insight
+from insight_db import init_db, log_upload, get_insight, get_submission_detail
 
 
 pdfmetrics.registerFont(TTFont("Cambria", "static/fonts/cambria.ttf"))
@@ -208,9 +208,10 @@ def extract_abstract_api():
         sdg_scores = result.get("sdg", {})
         sdg_list = [int(sdg.replace("Goal ", "")) for sdg, score in sdg_scores.items() if score > 30]
 
-    log_upload(filename, request.remote_addr, sdg_list)
+    submission_id = log_upload(filename, request.remote_addr, sdg_list)
 
     os.remove(file_path)
+    result["submission_id"] = submission_id
     return jsonify(result)
 
 
@@ -274,7 +275,22 @@ def admin_dashboard():
 @app.route('/download_result', methods=['POST'])
 def download_result():
     data = request.get_json()
-    filename = data.get("filename", "SDGresult").rsplit(".", 1)[0]
+    submission_id = data.get("submission_id")
+    if not submission_id:
+        return jsonify({"status": "error", "message": "submission_id is required"}), 400
+    
+    record = get_submission_detail(submission_id)
+    if not record:
+        return jsonify({"status": "error", "message": "Submission ID not found"}), 404
+    
+    filename = record["filename"].rsplit(".", 1)[0]
+    upload_time = record["created_at"]
+    sdg_ids = record["sdg"] or []
+    
+    submission_id_str = f"{submission_id:05d}"
+    submission_date_str = upload_time.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Ambil dari frontend tetap:
     abstract = data.get("abstract", "")
     sdg_scores = data.get("sdg", {})
 
@@ -313,6 +329,25 @@ def download_result():
     )
 
     elements = []
+    SDG_NAMES = {
+        1: "No Poverty",
+        2: "Zero Hunger",
+        3: "Good Health and Well-being",
+        4: "Quality Education",
+        5: "Gender Equality",
+        6: "Clean Water and Sanitation",
+        7: "Affordable and Clean Energy",
+        8: "Decent Work and Economic Growth",
+        9: "Industry, Innovation and Infrastructure",
+        10: "Reduced Inequalities",
+        11: "Sustainable Cities and Communities",
+        12: "Responsible Consumption and Production",
+        13: "Climate Action",
+        14: "Life Below Water",
+        15: "Life on Land",
+        16: "Peace, Justice and Strong Institutions",
+        17: "Partnerships for the Goals"
+    }
 
     # Title
     elements.append(Spacer(1, 10))
@@ -332,6 +367,22 @@ def download_result():
     """
     elements.append(Paragraph(notes, justified_style))
     elements.append(Spacer(1, 18))
+
+    elements.append(Paragraph(f"<b>Submission ID:</b> {submission_id_str}", normal_style))
+    elements.append(Paragraph(f"<b>Submission Date:</b> {submission_date_str}", normal_style))
+    elements.append(Paragraph(f"<b>File Name:</b> {filename}", normal_style))
+    
+    # sdg_texts = [f"Goal {sid} – {SDG_NAMES.get(sid, 'Unknown')}" for sid in sdg_ids]
+    # sdg_line = "; ".join(sdg_texts)
+    # elements.append(Paragraph(f"<b>SDG Detected:</b> {sdg_line}", normal_style))
+    if not sdg_ids:
+        elements.append(Paragraph(f"<b>SDG Detected:</b> None", normal_style))
+    else:
+        sdg_texts = [f"Goal {sid} – {SDG_NAMES.get(sid, 'Unknown')}" for sid in sdg_ids]
+        sdg_line = "; ".join(sdg_texts)
+        elements.append(Paragraph(f"<b>SDG Detected:</b> {sdg_line}", normal_style))
+    elements.append(Spacer(1, 18))
+
     elements.append(PageBreak())
 
 
@@ -367,7 +418,7 @@ def download_result():
     return send_file(
         buffer,
         as_attachment=True,
-        download_name="sdg_report.pdf",
+        download_name=f"{filename}_sdg_report.pdf",
         mimetype="application/pdf"
     )
 
