@@ -95,7 +95,7 @@ def draw_header(canvas, doc):
 
 
 def draw_footer(canvas, doc):
-    footer_path = "uploads/footer.png"
+    footer_path = "uploads/footer_result.png"
     footer_width = doc.pagesize[0]
     footer_height = 0.9 * inch  
 
