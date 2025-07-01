@@ -20,7 +20,6 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
     TableStyle, Image, HRFlowable, PageBreak
 )
-from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -100,7 +99,7 @@ def draw_footer(canvas, doc):
     footer_height = 0.9 * inch  
 
     x = 0
-    y = 0  # posisi paling bawah halaman
+    y = 0  
 
     canvas.drawImage(footer_path, x, y, width=footer_width, height=footer_height, preserveAspectRatio=True, mask='auto')
 
@@ -353,7 +352,7 @@ def download_result():
     }
 
     # Title
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 10))
 
     # General Notes
     elements.append(Paragraph("General Notes", heading_style))
@@ -371,11 +370,7 @@ def download_result():
     elements.append(Paragraph(notes, justified_style))
     elements.append(Spacer(1, 18))
     divider_path = "uploads/divider.png"
-
-    img_reader = ImageReader(divider_path)
-    img_width, img_height = img_reader.getSize()
-
-    divider = Image(divider_path, width=img_width, height=img_height)
+    divider = Image(divider_path, width=doc.pagesize[0], height=0.1 * inch)
     elements.append(Spacer(1, 12))
     elements.append(divider)
     elements.append(Spacer(1, 16)) 
