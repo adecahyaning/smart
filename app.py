@@ -20,6 +20,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
     TableStyle, Image, HRFlowable, PageBreak
 )
+from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -87,7 +88,7 @@ def draw_header(canvas, doc):
     canvas.setFont("ArialNova-Bold", 20)  
     text_width = canvas.stringWidth(text, "ArialNova-Bold", 20)
     x = (page_width - text_width) / 2
-    y = page_height - 1.0 * inch
+    y = page_height - 1.8 * inch
 
     canvas.drawString(x, y, text)
 
@@ -370,10 +371,23 @@ def download_result():
     elements.append(Paragraph(notes, justified_style))
     elements.append(Spacer(1, 18))
     divider_path = "uploads/divider.png"
-    divider = Image(divider_path, width=doc.pagesize[0], height=0.1 * inch)
+    img_reader = ImageReader(divider_path)
+    orig_width, orig_height = img_reader.getSize()
+
+    # Hitung ukuran baru agar lebarnya sesuai dengan lebar halaman dikurangi margin
+    margin = 1 * inch  # margin kiri + kanan = 2 inch
+    available_width = doc.pagesize[0] - margin
+
+    # Hitung rasio dan sesuaikan tinggi
+    scale = available_width / orig_width
+    new_width = available_width
+    new_height = orig_height * scale
+
+    divider = Image(divider_path, width=new_width, height=new_height)
+
     elements.append(Spacer(1, 12))
     elements.append(divider)
-    elements.append(Spacer(1, 16)) 
+    elements.append(Spacer(1, 16))
     
     elements.append(Paragraph(f"<b>Submission ID:</b> {submission_id_str}", normal_style))
     elements.append(Paragraph(f"<b>Submission Date:</b> {submission_date_str}", normal_style))
