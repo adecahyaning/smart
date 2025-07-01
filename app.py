@@ -20,6 +20,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
     TableStyle, Image, HRFlowable, PageBreak
 )
+from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -74,8 +75,8 @@ def extract_text_from_pdf(pdf_path):
 
 def draw_header(canvas, doc):
     logo_path = "uploads/LOGO_SC.jpg"
-    logo_width = 2.8 * inch  # diperbesar
-    logo_height = logo_width * (0.55 / 2.2)  # jaga rasio
+    logo_width = 2.8 * inch  
+    logo_height = logo_width * (0.55 / 2.2)  #rasio
 
     page_width, page_height = A4
     x = (page_width - logo_width) / 2
@@ -84,10 +85,10 @@ def draw_header(canvas, doc):
     canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True)
 
     text = "SDG Mapping and Assessment Report"
-    canvas.setFont("ArialNova-Bold", 20)  # diperbesar dari 18
+    canvas.setFont("ArialNova-Bold", 20)  
     text_width = canvas.stringWidth(text, "ArialNova-Bold", 20)
     x = (page_width - text_width) / 2
-    y = page_height - 1.3 * inch
+    y = page_height - 1.0 * inch
 
     canvas.drawString(x, y, text)
 
@@ -352,7 +353,7 @@ def download_result():
     }
 
     # Title
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 20))
 
     # General Notes
     elements.append(Paragraph("General Notes", heading_style))
@@ -370,7 +371,11 @@ def download_result():
     elements.append(Paragraph(notes, justified_style))
     elements.append(Spacer(1, 18))
     divider_path = "uploads/divider.png"
-    divider = Image(divider_path, width=doc.pagesize[0], height=0.9 * inch)
+
+    img_reader = ImageReader(divider_path)
+    img_width, img_height = img_reader.getSize()
+
+    divider = Image(divider_path, width=img_width, height=img_height)
     elements.append(Spacer(1, 12))
     elements.append(divider)
     elements.append(Spacer(1, 16)) 
