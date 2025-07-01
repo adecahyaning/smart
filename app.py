@@ -33,7 +33,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from insight_db import init_db, log_upload, get_insight, get_submission_detail
 
 
-pdfmetrics.registerFont(TTFont("Cambria", "static/fonts/cambria.ttf"))
+pdfmetrics.registerFont(TTFont("ArialNova", "static/fonts/ArialNova.ttf"))
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -83,8 +83,8 @@ def draw_header(canvas, doc):
     canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True)
 
     text = "SDG Mapping and Assessment Report"
-    canvas.setFont("Times-Bold", 18)
-    width = canvas.stringWidth(text, "Times-Bold", 18)
+    canvas.setFont("ArialNova", 18)
+    width = canvas.stringWidth(text, "ArialNova", 18)
     page_width = doc.pagesize[0]
     x = (page_width - width) / 2
     y = doc.pagesize[1] - 1.1 * inch  # atur jarak dari atas
@@ -95,7 +95,7 @@ def draw_header(canvas, doc):
 
 
 def draw_footer(canvas, doc):
-    footer_path = "uploads/footer_result.png"
+    footer_path = "uploads/footer.png"
     footer_width = doc.pagesize[0]
     footer_height = 0.9 * inch  
 
@@ -141,7 +141,7 @@ def extract_abstract(text):
             return " ".join(text.split()[:300])
 
 def classify_with_aurora(abstract):
-    url = "https://aurora-sdg.labs.vu.nl/classifier/classify/aurora-sdg-multi"
+    url = "https://aurora-sdg.labs.vu.nl/classifier/classify/elsevier-sdg-multi"
     headers = {"Content-Type": "application/json"}
     payload = json.dumps({"text": abstract})
 
@@ -253,7 +253,6 @@ def admin_dashboard():
         <div class="section">
             <h1>📊 Platform Insight</h1>
             <p><strong>Total uploads:</strong> {total}</p>
-            # <p><strong>Last upload:</strong> {last_upload}</p>
             <p><strong>Last upload:</strong> {last_upload.astimezone(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d %H:%M:%S')}</p>
         </div>
 
@@ -310,7 +309,7 @@ def download_result():
     styles = getSampleStyleSheet()
 
     normal_style = styles["Normal"]
-    normal_style.fontName = "Cambria"
+    normal_style.fontName = "ArialNova"
     normal_style.spaceAfter = 12
 
     justified_style = ParagraphStyle(
@@ -318,14 +317,14 @@ def download_result():
         parent=normal_style,
         alignment=TA_JUSTIFY,
         fontSize=11,
-        fontName="Cambria"
+        fontName="ArialNova"
     )
 
     heading_style = ParagraphStyle(
         name="Heading",
         fontSize=14,
         leading=16,
-        fontName="Times-Bold",
+        fontName="ArialNova",
         textColor=HexColor("#31572C"),
         alignment=TA_LEFT,
         spaceBefore=12,
@@ -370,7 +369,7 @@ def download_result():
     This abstract-based analysis enables efficient and scalable SDG classification.
     """
     elements.append(Paragraph(notes, justified_style))
-    elements.append(Spacer(1, 18))
+    elements.append(Spacer(1, 100))
 
     elements.append(Paragraph(f"<b>Submission ID:</b> {submission_id_str}", normal_style))
     elements.append(Paragraph(f"<b>Submission Date:</b> {submission_date_str}", normal_style))
