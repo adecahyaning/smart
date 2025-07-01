@@ -34,6 +34,7 @@ from insight_db import init_db, log_upload, get_insight, get_submission_detail
 
 
 pdfmetrics.registerFont(TTFont("ArialNova", "static/fonts/ArialNova.ttf"))
+pdfmetrics.registerFont(TTFont("ArialNova-Bold", "static/fonts/ArialNova-Bold.ttf"))
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
@@ -72,26 +73,26 @@ def extract_text_from_pdf(pdf_path):
     return remove_illegal_chars(text)
 
 def draw_header(canvas, doc):
-    # Atur posisi logo (dari kiri dan dari bawah)
     logo_path = "uploads/logo_header.jpg"
-    logo_width = 2.2 * inch
-    logo_height = 0.55 * inch
+    logo_width = 2.8 * inch  # diperbesar
+    logo_height = logo_width * (0.55 / 2.2)  # jaga rasio
+
     page_width, page_height = A4
     x = (page_width - logo_width) / 2
-    y = page_height - logo_height - 0.15 * inch  
+    y = page_height - logo_height - 0.2 * inch
 
     canvas.drawImage(logo_path, x, y, width=logo_width, height=logo_height, preserveAspectRatio=True)
 
     text = "SDG Mapping and Assessment Report"
-    canvas.setFont("ArialNova", 18)
-    width = canvas.stringWidth(text, "ArialNova", 18)
-    page_width = doc.pagesize[0]
-    x = (page_width - width) / 2
-    y = doc.pagesize[1] - 1.1 * inch  # atur jarak dari atas
+    canvas.setFont("ArialNova", 20)  # diperbesar dari 18
+    text_width = canvas.stringWidth(text, "ArialNova-Bold", 20)
+    x = (page_width - text_width) / 2
+    y = page_height - 1.1 * inch
 
     canvas.drawString(x, y, text)
     canvas.setLineWidth(1)
-    canvas.line(x, y - 2, x + width, y - 2) 
+    canvas.line(x, y - 2, x + text_width, y - 2)
+
 
 
 def draw_footer(canvas, doc):
@@ -324,7 +325,7 @@ def download_result():
         name="Heading",
         fontSize=14,
         leading=16,
-        fontName="ArialNova",
+        fontName="ArialNova-Bold",
         textColor=HexColor("#31572C"),
         alignment=TA_LEFT,
         spaceBefore=12,
@@ -369,8 +370,13 @@ def download_result():
     This abstract-based analysis enables efficient and scalable SDG classification.
     """
     elements.append(Paragraph(notes, justified_style))
-    elements.append(Spacer(1, 100))
-
+    elements.append(Spacer(1, 18))
+    divider_path = "uploads/divider.png"
+    divider = Image(divider_path, width=doc.pagesize[0], height=0.3 * inch)
+    elements.append(Spacer(1, 12))
+    elements.append(divider)
+    elements.append(Spacer(1, 16)) 
+    
     elements.append(Paragraph(f"<b>Submission ID:</b> {submission_id_str}", normal_style))
     elements.append(Paragraph(f"<b>Submission Date:</b> {submission_date_str}", normal_style))
     elements.append(Paragraph(f"<b>File Name:</b> {filename}", normal_style))
