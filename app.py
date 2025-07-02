@@ -88,7 +88,7 @@ def draw_header(canvas, doc):
     canvas.setFont("ArialNova-Bold", 20)  
     text_width = canvas.stringWidth(text, "ArialNova-Bold", 20)
     x = (page_width - text_width) / 2
-    y = page_height - 1.8 * inch
+    y = page_height - 1.6 * inch
 
     canvas.drawString(x, y, text)
 
@@ -353,7 +353,7 @@ def download_result():
     }
 
     # Title
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 20))
 
     # General Notes
     elements.append(Paragraph("General Notes", heading_style))
