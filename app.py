@@ -353,7 +353,7 @@ def download_result():
     }
 
     # Title
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 30))
 
     # General Notes
     elements.append(Paragraph("General Notes", heading_style))
