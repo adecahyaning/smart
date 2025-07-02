@@ -385,23 +385,23 @@ def download_result():
 
     divider = Image(divider_path, width=new_width, height=new_height)
 
-    elements.append(Spacer(1, 12))
     elements.append(divider)
     elements.append(Spacer(1, 16))
+
+    elements.append(Paragraph(
+        f"<b>Submission ID:</b> <font color='#0000FF'>{submission_id_str}</font>", justified_style))
+    elements.append(Paragraph(
+        f"<b>Submission Date:</b> <font color='#0000FF'>{submission_date_str}</font>", justified_style))
+    elements.append(Paragraph(
+        f"<b>File Name:</b> <font color='#0000FF'>{filename}</font>", justified_style))
     
-    elements.append(Paragraph(f"<b>Submission ID:</b> {submission_id_str}", normal_style))
-    elements.append(Paragraph(f"<b>Submission Date:</b> {submission_date_str}", normal_style))
-    elements.append(Paragraph(f"<b>File Name:</b> {filename}", normal_style))
-    
-    # sdg_texts = [f"Goal {sid} – {SDG_NAMES.get(sid, 'Unknown')}" for sid in sdg_ids]
-    # sdg_line = "; ".join(sdg_texts)
-    # elements.append(Paragraph(f"<b>SDG Detected:</b> {sdg_line}", normal_style))
     if not sdg_ids:
-        elements.append(Paragraph(f"<b>SDG Detected:</b> None", normal_style))
+        elements.append(Paragraph("<b>SDG Detected:</b> <font color='#0000FF'>None</font>", justified_style))
     else:
         sdg_texts = [f"Goal {sid} – {SDG_NAMES.get(sid, 'Unknown')}" for sid in sdg_ids]
         sdg_line = "; ".join(sdg_texts)
-        elements.append(Paragraph(f"<b>SDG Detected:</b> {sdg_line}", normal_style))
+        elements.append(Paragraph(f"<b>SDG Detected:</b> <font color='#0000FF'>{sdg_line}</font>", justified_style))
+
     elements.append(Spacer(1, 18))
 
     elements.append(PageBreak())
