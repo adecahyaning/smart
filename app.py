@@ -37,6 +37,12 @@ from insight_db import init_db, log_upload, get_insight, get_submission_detail
 pdfmetrics.registerFont(TTFont("ArialNova", "static/fonts/ArialNova.ttf"))
 pdfmetrics.registerFont(TTFont("ArialNova-Bold", "static/fonts/ArialNova-Bold.ttf"))
 
+pdfmetrics.registerFontFamily(
+    'ArialNova',
+    normal='ArialNova',
+    bold='ArialNova-Bold'
+)
+
 DB_CONFIG = {
     "host": os.getenv("PGHOST"),
     "port": os.getenv("PGPORT"),
