@@ -225,7 +225,7 @@ def extract_abstract_api():
 def admin_dashboard():
     total, last_upload, recent = get_insight()
 
-    html = f"""
+     html = f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -247,11 +247,22 @@ def admin_dashboard():
                 border-radius: 8px;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             }}
-            ul {{
-                padding-left: 20px;
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
             }}
-            li {{
-                margin-bottom: 10px;
+            th, td {{
+                border: 1px solid #ddd;
+                padding: 10px;
+                text-align: left;
+            }}
+            th {{
+                background-color: #f2f2f2;
+                color: #555;
+            }}
+            tr:nth-child(even) {{
+                background-color: #f8f8f8;
             }}
         </style>
     </head>
@@ -259,17 +270,34 @@ def admin_dashboard():
         <div class="section">
             <h1>📊 Platform Insight</h1>
             <p><strong>Total uploads:</strong> {total}</p>
-            <p><strong>Last upload:</strong> {last_upload.astimezone(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>Last upload:</strong> {last_upload.astimezone(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d %H:%M:%S') if last_upload else 'N/A'}</p>
         </div>
 
         <div class="section">
             <h2>🕒 Last 10 uploads:</h2>
-            <ul>
-                {''.join(
-                    f'<li>{t.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S")} — {f} ({ip}) - {loc} — SDG: {sdg if sdg else "-"}</li>'
-                    for f, t, ip, loc, sdg in recent
-                )}
-            </ul>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Timestamp</th>
+                        <th>IP Address</th>
+                        <th>Location</th>
+                        <th>SDG</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(
+                        f'<tr>'
+                        f'<td>{f}</td>'
+                        f'<td>{t.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d %H:%M:%S")}</td>'
+                        f'<td>{ip}</td>'
+                        f'<td>{loc}</td>'
+                        f'<td>{sdg if sdg else "-"}</td>'
+                        f'</tr>'
+                        for f, t, ip, loc, sdg in recent
+                    )}
+                </tbody>
+            </table>
         </div>
     </body>
     </html>
