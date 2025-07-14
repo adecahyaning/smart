@@ -224,8 +224,8 @@ def extract_abstract_api():
 @app.route("/admin", methods=["GET"])
 def admin_dashboard():
     total, last_upload, recent = get_insight()
-
-     html = f"""
+    
+    html = f"""
     <!DOCTYPE html>
     <html>
     <head>
